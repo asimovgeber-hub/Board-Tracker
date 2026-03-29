@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Board Tracker - Seguimiento de Hábitos</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --theme-color: #00ff88;
+            --theme-color-transparent: rgba(0, 255, 136, 0.4);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0a0a0a; color: #e0e0e0;
+            overflow: hidden; height: 100vh;
+        }
+
+        .container {
+            max-width: 100vw; height: 100vh;
+            padding: 10px; display: flex; flex-direction: column;
+        }
+
+        /* Header y Navegación */
+        .header {
+            background: #1a1a1a; padding: 10px 15px; border-radius: 8px;
+            margin-bottom: 10px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+            display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+        }
+        .header h1 { color: var(--theme-color); font-size: 1.4em; }
+        .nav-buttons { display: flex; gap: 8px; align-items: center; }
+        .nav-btn {
+            padding: 8px 16px; border: none; border-radius: 6px;
+            background: #2a2a2a; color: var(--theme-color); cursor: pointer;
+            font-size: 0.9em; transition: all 0.3s; border: 1px solid var(--theme-color);
+        }
+        .nav-btn:hover { background: var(--theme-color); color: #0a0a0a; transform: translateY(-2px); }
+        .nav-btn.active { background: var(--theme-color); color: #0a0a0a; box-shadow: 0 4px 15px var(--theme-color-transparent); }
+        .time-warning { background: #ffd93d; color: #000; padding: 5px 10px; border-radius: 4px; font-weight: bold; font-size: 0.85em; display: none; }
+
+        /* Vista Principal */
+        .main-view {
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+            flex: 1; overflow-y: auto; max-height: calc(100vh - 70px); padding-right: 5px;
+        }
+
+        .habit-card {
+            background: #1a1a1a; padding: 15px; border-radius: 8px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5); border: 1px solid #2a2a2a;
+            display: flex; flex-direction: column; min-height: 350px;
+        }
+        .habit-card h2 {
+            color: var(--theme-color); margin-bottom: 12px; font-size: 1.1em;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+
+        /* Controles */
+        .chart-controls { display: flex; gap: 6px; font-size: 0.85em; }
+        .chart-type-select {
+            background: #2a2a2a; color: var(--theme-color); border: 1px solid var(--theme-color);
+            border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 0.85em;
+        }
+        .control-btn {
+            background: #2a2a2a; color: #ff6b6b; border: 1px solid #ff6b6b;
+            border-radius: 4px; padding: 4px 8px; cursor: pointer; transition: all 0.2s;
+        }
+        .control-btn:hover { background: #ff6b6b; color: #0a0a0a; }
+
+        .chart-container { position: relative; flex-grow: 1; width: 100%; min-height: 180px; margin-top: 10px; }
+
+        .daily-check {
+            background: #0f0f0f; padding: 10px; border-radius: 6px; margin-bottom: 8px; border: 1px solid #2a2a2a; flex-shrink: 0;
+        }
+        .daily-check summary { font-size: 0.9em; color: var(--theme-color); cursor: pointer; font-weight: bold; outline: none; user-select: none; }
+        
+        .checkbox-container { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+        .checkbox-container input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--theme-color); cursor: pointer; }
+        .checkbox-container label { font-size: 0.9em; color: #d0d0d0; cursor: pointer; }
+
+        .heat-calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 8px; flex-grow: 1; align-content: start; }
+        .heat-day {
+            aspect-ratio: 1; border-radius: 4px; background: #0f0f0f; border: 1px solid #2a2a2a;
+            display: flex; align-items: center; justify-content: center; font-size: 0.85em;
+            cursor: pointer; transition: all 0.2s; color: #606060; max-width: 35px; max-height: 35px; margin: 0 auto; width: 100%;
+        }
+        .heat-day:hover { transform: scale(1.05); border-color: var(--theme-color); }
+        .heat-day.completed { background: var(--theme-color); color: #0a0a0a; border-color: var(--theme-color); font-weight: bold;}
+        .heat-day.partial { background: #ffd93d; color: #0a0a0a; border-color: #ffd93d; font-weight: bold;}
+        .heat-day.missed { background: #ff6b6b; color: white; border-color: #ff6b6b; }
+
+        /* Inputs compartidos */
+        .flex-input { display: flex; gap: 6px; align-items: center; margin: 8px 0; flex-wrap: wrap; }
+        .flex-input input, .flex-input select {
+            flex: 1; min-width: 60px; padding: 6px; border: 1px solid #2a2a2a;
+            border-radius: 4px; font-size: 0.85em; background: #0f0f0f; color: #e0e0e0;
+        }
+        .flex-input input:focus, .flex-input select:focus { outline: none; border-color: var(--theme-color); }
+        .flex-input button {
+            padding: 6px 12px; background: #2a2a2a; color: var(--theme-color);
+            border: 1px solid var(--theme-color); border-radius: 4px; cursor: pointer; font-size: 0.85em;
+        }
+        .flex-input button:hover { background: var(--theme-color); color: #0a0a0a; }
+
+        /* Vistas Extras */
+        .additional-view {
+            background: #1a1a1a; padding: 20px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+            border: 1px solid #2a2a2a; overflow-y: auto; max-height: calc(100vh - 70px);
+        }
+        .config-section { margin-bottom: 25px; background: #0f0f0f; padding: 15px; border-radius: 8px; border: 1px solid #2a2a2a; }
+        .config-section h2 { color: var(--theme-color); margin-bottom: 12px; font-size: 1.2em; }
+        .config-item { display: flex; gap: 10px; margin: 10px 0; align-items: center; flex-wrap: wrap; }
+        .config-item input[type="text"], .config-item input[type="number"], .config-item input[type="time"] {
+            flex: 1; padding: 8px; border: 1px solid #2a2a2a; border-radius: 6px; background: #1a1a1a; color: #e0e0e0;
+        }
+        .config-item button { padding: 8px 16px; background: #2a2a2a; color: var(--theme-color); border: 1px solid var(--theme-color); border-radius: 6px; cursor: pointer; }
+        .config-item button:hover { background: var(--theme-color); color: #0a0a0a; }
+        .item-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+        .item-tag {
+            background: #2a2a2a; color: var(--theme-color); padding: 6px 12px; border-radius: 20px;
+            display: flex; align-items: center; gap: 8px; border: 1px solid var(--theme-color); font-size: 0.9em;
+        }
+        .item-tag button { background: rgba(255, 107, 107, 0.3); border: none; color: #ff6b6b; cursor: pointer; border-radius: 50%; padding: 0 5px; }
+
+        .hidden { display: none !important; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #0a0a0a; }
+        ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--theme-color); }
+        
+        .status-dot { height: 10px; width: 10px; background-color: #ff6b6b; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .status-dot.active { background-color: var(--theme-color); box-shadow: 0 0 8px var(--theme-color); }
+
+        @media (max-width: 1400px) { .main-view { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 900px) { .main-view { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Board Tracker <span id="wakeLockStatus" class="status-dot" title="Wake Lock Inactivo"></span></h1>
+            <div class="nav-buttons">
+                <span id="timeWarning" class="time-warning">⏳ Editando fecha pasada</span>
+                <button class="nav-btn active" onclick="showView('main')">Principal</button>
+                <button class="nav-btn" onclick="showView('additional')">Configuración y Adicionales</button>
+                <button class="nav-btn" onclick="showView('history')">Historial</button>
+            </div>
+        </div>
+
+        <div id="mainView" class="main-view">
+            
+            <div class="habit-card">
+                <h2>😴 Salud de Sueño
+                    <div class="chart-controls">
+                        <select class="chart-type-select" id="sleepChartType" onchange="renderSleepChart()">
+                            <option value="calendar">Heatmap (Patrones)</option>
+                            <option value="deviation">Desviación vs Ideal</option>
+                            <option value="accumulated">Área Acumulada</option>
+                        </select>
+                        <button class="control-btn" onclick="resetHabitData('sleep')">🗑️</button>
+                    </div>
+                </h2>
+                <details class="daily-check" id="sleepDetails" open>
+                    <summary>✨ Registrar Sueño</summary>
+                    <div class="flex-input">
+                        <label style="font-size:0.8em; color:#aaa;">Me dormí a las:</label>
+                        <input type="time" id="sleepTimeIn">
+                    </div>
+                    <div class="flex-input">
+                        <label style="font-size:0.8em; color:#aaa;">Me desperté a las:</label>
+                        <input type="time" id="wakeTimeIn">
+                        <button onclick="updateSleep()">Guardar</button>
+                    </div>
+                </details>
+                <div class="chart-container" id="sleepChartContainer"><canvas id="sleepChart"></canvas></div>
+                <div class="heat-calendar hidden" id="sleepCalendar"></div>
+            </div>
+
+            <div class="habit-card">
+                <h2>📚 Estudio
+                    <div class="chart-controls">
+                        <select class="chart-type-select" id="studyChartType" onchange="renderStudyChart()">
+                            <option value="stacked">Barras por Materia</option>
+                            <option value="accumulation">Curva Acumulación</option>
+                            <option value="streaks">Rachas (Streaks)</option>
+                            <option value="scatter">Tiempo vs Rendimiento</option>
+                        </select>
+                        <button class="control-btn" onclick="resetHabitData('study')">🗑️</button>
+                    </div>
+                </h2>
+                <details class="daily-check" open>
+                    <summary>✨ Registrar Estudio</summary>
+                    <div class="flex-input">
+                        <select id="studySubjectSelect"></select>
+                        <input type="number" id="studyHours" placeholder="Horas" step="0.5">
+                    </div>
+                    <div class="flex-input">
+                        <input type="number" id="studyPerf" placeholder="Rendimiento (1-10)" min="1" max="10">
+                        <button onclick="updateStudy()">Registrar</button>
+                    </div>
+                </details>
+                <div class="chart-container"><canvas id="studyChart"></canvas></div>
+            </div>
+
+            <div class="habit-card">
+                <h2>🏋️ Ejercicio
+                    <div class="chart-controls">
+                        <select class="chart-type-select" id="exerciseChartType" onchange="renderExerciseChart()">
+                            <option value="bar">Duración Diaria</option>
+                            <option value="lineProgress">Progreso (Métrica)</option>
+                            <option value="radarTypes">Radar por Tipos</option>
+                            <option value="frequency">Frecuencia Semanal</option>
+                        </select>
+                        <button class="control-btn" onclick="resetHabitData('exercise')">🗑️</button>
+                    </div>
+                </h2>
+                <details class="daily-check" open>
+                    <summary>✨ Registrar Entrenamiento</summary>
+                    <div class="flex-input">
+                        <select id="exerciseTypeSelect"></select>
+                        <input type="number" id="exDuration" placeholder="Minutos">
+                    </div>
+                    <div class="flex-input">
+                        <input type="number" id="exMetric" placeholder="Métrica (Peso/Reps)">
+                        <button onclick="updateExercise()">Registrar</button>
+                    </div>
+                </details>
+                <div class="chart-container"><canvas id="exerciseChart"></canvas></div>
+            </div>
+
+            <div class="habit-card">
+                <h2>📖 Lectura
+                    <div class="chart-controls">
+                        <select class="chart-type-select" id="readingChartType" onchange="renderReadingChart()">
+                            <option value="bar">Páginas por día</option>
+                            <option value="area">Línea Acumulativa</option>
+                            <option value="goalVsActual">Meta vs Logrado</option>
+                            <option value="timeline">Timeline de Libros</option>
+                        </select>
+                        <button class="control-btn" onclick="resetHabitData('reading')">🗑️</button>
+                    </div>
+                </h2>
+                <details class="daily-check" open>
+                    <summary>✨ Avance de hoy</summary>
+                    <div class="flex-input">
+                        <select id="bookSelector"></select>
+                        <input type="number" id="pagesRead" placeholder="Páginas" min="0">
+                        <button onclick="updateReading()">Registrar</button>
+                    </div>
+                    <div class="flex-input">
+                        <button style="width:100%;" onclick="toggleBookStatus()">📚 Marcar Empezado/Terminado</button>
+                    </div>
+                </details>
+                <div class="chart-container"><canvas id="readingChart"></canvas></div>
+            </div>
+
+            <div class="habit-card">
+                <h2>✨ Cuidado Personal
+                    <div class="chart-controls">
+                        <select class="chart-type-select" id="careChartType" onchange="renderPersonalCareChart()">
+                            <option value="radar">Gráfico Radar</option>
+                            <option value="compliance">Línea de Cumplimiento</option>
+                            <option value="calendar">Calendario Heatmap</option>
+                        </select>
+                        <button class="control-btn" onclick="resetHabitData('personalCare')">🗑️</button>
+                    </div>
+                </h2>
+                <details class="daily-check" open>
+                    <summary>✨ Tareas del día</summary>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px;">
+                        <div class="checkbox-container"><input type="checkbox" id="care_ducha" onchange="updatePersonalCare()"><label for="care_ducha">Ducha</label></div>
+                        <div class="checkbox-container"><input type="checkbox" id="care_cara" onchange="updatePersonalCare()"><label for="care_cara">Lavado cara</label></div>
+                        <div class="checkbox-container"><input type="checkbox" id="care_dientes_m" onchange="updatePersonalCare()"><label for="care_dientes_m">Dientes ☀️</label></div>
+                        <div class="checkbox-container"><input type="checkbox" id="care_dientes_t" onchange="updatePersonalCare()"><label for="care_dientes_t">Dientes 🌤️</label></div>
+                        <div class="checkbox-container"><input type="checkbox" id="care_dientes_n" onchange="updatePersonalCare()"><label for="care_dientes_n">Dientes 🌙</label></div>
+                        <div class="checkbox-container"><input type="checkbox" id="care_skin" onchange="updatePersonalCare()"><label for="care_skin">Skin Care</label></div>
+                    </div>
+                </details>
+                <div class="chart-container" id="personalCareChartContainer"><canvas id="personalCareChart"></canvas></div>
+                <div class="heat-calendar hidden" id="personalCareCalendar"></div>
+            </div>
+
+            <div class="habit-card">
+                <h2>🎸 Hobbies
+                    <div class="chart-controls">
+                        <select class="chart-type-select" id="hobbiesChartType" onchange="renderHobbiesChart()">
+                            <option value="bar">Tiempo por Hobby</option>
+                            <option value="variety">Variedad (Conteo)</option>
+                            <option value="timeline">Timeline Flexible</option>
+                            <option value="radar">Radar</option>
+                        </select>
+                        <button class="control-btn" onclick="resetHabitData('hobbies')">🗑️</button>
+                    </div>
+                </h2>
+                <div style="display: flex; flex-direction: row; gap: 10px; height: 100%;">
+                    <div style="flex: 0 0 35%; display: flex; flex-direction: column;">
+                        <details class="daily-check" style="margin-bottom: 0; max-height: 200px; overflow-y: auto;" open>
+                            <summary>✨ Tiempo (min)</summary>
+                            <div id="hobbiesInputs" style="margin-top: 5px; display: flex; flex-direction: column; gap: 4px;"></div>
+                        </details>
+                    </div>
+                    <div class="chart-container" style="margin-top:0;"><canvas id="hobbiesChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="additionalView" class="additional-view hidden">
+            <div class="config-section" style="border-color: #ffd93d;">
+                <h2 style="color: #ffd93d;">⏳ Máquina del Tiempo (Editar datos pasados)</h2>
+                <p style="color:#aaa; font-size:0.9em; margin-bottom:10px;">Selecciona una fecha y la aplicación entera viajará a ese día. Ve a la pestaña Principal, edita lo que necesites, y luego borra la fecha aquí para volver al presente.</p>
+                <div class="flex-input">
+                    <input type="date" id="timeMachineDate" style="background: #2a2a0a; border-color: #ffd93d;" onchange="updateTimeMachine()">
+                    <button style="background: #1a1a1a; color: #ffd93d; border-color: #ffd93d;" onclick="resetTimeMachine()">Volver a Hoy</button>
+                </div>
+            </div>
+
+            <div class="config-section">
+                <h2>🎨 Apariencia e Interfaz</h2>
+                <div class="config-item">
+                    <label style="color: #b0b0b0;">Color Principal:</label>
+                    <input type="color" id="themeColorPicker" value="#00ff88" onchange="updateThemeColor()" style="border:none; height:35px; width:50px; cursor:pointer; background:transparent;">
+                </div>
+            </div>
+            <div class="config-section">
+                <h2>📚 Administrar Materias de Estudio</h2>
+                <div class="config-item"><input type="text" id="subjectInput" placeholder="Nueva materia"><button onclick="addListItem('studySubjects', 'subjectInput')">Agregar</button></div>
+                <div class="item-list" id="subjectsList"></div>
+            </div>
+            <div class="config-section">
+                <h2>🏋️ Administrar Tipos de Ejercicio</h2>
+                <div class="config-item"><input type="text" id="exerciseTypeInput" placeholder="Ej: Fuerza, Cardio"><button onclick="addListItem('exerciseTypes', 'exerciseTypeInput')">Agregar</button></div>
+                <div class="item-list" id="exerciseTypesList"></div>
+            </div>
+            <div class="config-section">
+                <h2>📖 Administrar Libros y Metas</h2>
+                <div class="config-item"><label style="color:#b0b0b0;">Meta mensual de páginas:</label><input type="number" id="monthlyReadingGoal" onchange="updateReadingGoal()"></div>
+                <div class="config-item"><input type="text" id="bookInput" placeholder="Nombre del libro"><button onclick="addListItem('books', 'bookInput')">Agregar</button></div>
+                <div class="item-list" id="booksList"></div>
+            </div>
+            <div class="config-section">
+                <h2>🎸 Administrar Hobbies</h2>
+                <div class="config-item"><input type="text" id="hobbyInput" placeholder="Nombre del hobby"><button onclick="addListItem('hobbiesList', 'hobbyInput')">Agregar</button></div>
+                <div class="item-list" id="hobbiesAdminList"></div>
+            </div>
+        </div>
+
+        <div id="historyView" class="additional-view hidden">
+            <h2>📅 Historial</h2><p style="color:#b0b0b0;">Los meses archivados aparecerán aquí.</p><div id="monthsHistory"></div>
+        </div>
+    </div>
+
+    <script>
+        const DATA_KEY = 'habitTrackerDataFull';
+        const palette = ['#FF6B6B', '#4D96FF', '#6BCB77', '#FFD93D', '#9B5DE5', '#F15BB5', '#00BBF9', '#FEE440'];
+        let charts = {};
+        let timeMachineActiveDate = null;
+        
+        let currentData = {
+            month: new Date().getMonth(), year: new Date().getFullYear(), themeColor: '#00ff88',
+            sleep: {}, study: {}, exercise: {}, reading: {}, personalCare: {}, hobbies: {}, bookDates: {},
+            studySubjects: ['Matemáticas', 'Programación'],
+            exerciseTypes: ['Fuerza', 'Cardio', 'Movilidad'],
+            books: ['Libro 1', 'Libro 2'],
+            hobbiesList: ['Guitarra', 'Pintura'],
+            readingGoal: 500
+        };
+
+        // ================= WAKE LOCK =================
+        let wakeLock = null;
+        async function requestWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    document.getElementById('wakeLockStatus').classList.add('active');
+                    wakeLock.addEventListener('release', () => document.getElementById('wakeLockStatus').classList.remove('active'));
+                }
+            } catch (err) { console.warn('Wake Lock error:', err); }
+        }
+        document.addEventListener('visibilitychange', () => { if (wakeLock !== null && document.visibilityState === 'visible') requestWakeLock(); });
+
+        // ================= INICIALIZACIÓN Y UTILIDADES =================
+        function init() {
+            loadData(); requestWakeLock();
+            applyThemeColor(currentData.themeColor);
+            updateSelectors(); renderAllViews();
+        }
+
+        function getBaseDate() {
+            if (timeMachineActiveDate) {
+                const parts = timeMachineActiveDate.split('-');
+                return new Date(parts[0], parts[1]-1, parts[2]);
+            }
+            return new Date();
+        }
+        function getDateKey(d = null) {
+            let target = d || getBaseDate();
+            return `${target.getFullYear()}-${String(target.getMonth()+1).padStart(2,'0')}-${String(target.getDate()).padStart(2,'0')}`;
+        }
+        function getLast7Days() { 
+            return Array.from({length:7}, (_,i) => { let d=getBaseDate(); d.setDate(d.getDate()-(6-i)); return getDateKey(d); }); 
+        }
+        function getMonthDays() { 
+            let bd = getBaseDate();
+            return Array.from({length: new Date(bd.getFullYear(), bd.getMonth()+1, 0).getDate()}, (_,i) => {
+                let d = new Date(bd.getFullYear(), bd.getMonth(), i+1);
+                return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+            });
+        }
+
+        function updateTimeMachine() {
+            timeMachineActiveDate = document.getElementById('timeMachineDate').value;
+            let warningEl = document.getElementById('timeWarning');
+            if(timeMachineActiveDate) {
+                warningEl.style.display = 'block';
+                warningEl.textContent = `⏳ Editando: ${timeMachineActiveDate}`;
+            } else {
+                warningEl.style.display = 'none';
+            }
+            renderAllViews();
+        }
+
+        function resetTimeMachine() {
+            document.getElementById('timeMachineDate').value = '';
+            updateTimeMachine();
+        }
+
+        function updateSelectors() {
+            const populate = (id, list) => {
+                const el = document.getElementById(id);
+                if(el) el.innerHTML = list.map(item => `<option value="${item}">${item}</option>`).join('');
+            };
+            populate('studySubjectSelect', currentData.studySubjects);
+            populate('exerciseTypeSelect', currentData.exerciseTypes);
+            populate('bookSelector', currentData.books);
+            if(document.getElementById('monthlyReadingGoal')) document.getElementById('monthlyReadingGoal').value = currentData.readingGoal;
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem(DATA_KEY);
+            if (saved) currentData = {...currentData, ...JSON.parse(saved)};
+        }
+        function saveData() { localStorage.setItem(DATA_KEY, JSON.stringify(currentData)); }
+
+        function showView(view) {
+            ['mainView', 'additionalView', 'historyView'].forEach(v => document.getElementById(v).classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(view+'View').classList.remove('hidden');
+            event.target.classList.add('active');
+            if(view === 'main') renderAllViews();
+            if(view === 'additional') renderAdditionalView();
+        }
+
+        function applyThemeColor(color) {
+            document.documentElement.style.setProperty('--theme-color', color);
+            document.documentElement.style.setProperty('--theme-color-transparent', color+'40');
+            document.getElementById('themeColorPicker').value = color;
+            currentData.themeColor = color; saveData();
+            if(!document.getElementById('mainView').classList.contains('hidden')) renderAllViews();
+        }
+
+        // ================= 1. SALUD DE SUEÑO =================
+        function updateSleep() {
+            const sIn = document.getElementById('sleepTimeIn').value;
+            const wIn = document.getElementById('wakeTimeIn').value;
+            if(!sIn || !wIn) return;
+            currentData.sleep[getDateKey()] = { sleepTime: sIn, wakeTime: wIn };
+            saveData(); renderSleepChart();
+        }
+        function getSleepDuration(sTime, wTime) {
+            let [sh, sm] = sTime.split(':').map(Number); let [wh, wm] = wTime.split(':').map(Number);
+            let diff = (wh + wm/60) - (sh + sm/60);
+            return diff < 0 ? diff + 24 : diff;
+        }
+        
+        function renderSleepChart() {
+            let todayObj = currentData.sleep[getDateKey()];
+            document.getElementById('sleepTimeIn').value = todayObj ? todayObj.sleepTime : '';
+            document.getElementById('wakeTimeIn').value = todayObj ? todayObj.wakeTime : '';
+
+            const type = document.getElementById('sleepChartType').value;
+            const container = document.getElementById('sleepChartContainer');
+            const calendar = document.getElementById('sleepCalendar');
+            const cColor = currentData.themeColor;
+            
+            if (type === 'calendar') {
+                container.classList.add('hidden'); calendar.classList.remove('hidden');
+                calendar.innerHTML = '';
+                getMonthDays().forEach((dKey, i) => {
+                    let dEl = document.createElement('div'); dEl.className = 'heat-day'; dEl.textContent = i+1;
+                    if(currentData.sleep[dKey]) {
+                        let dur = getSleepDuration(currentData.sleep[dKey].sleepTime, currentData.sleep[dKey].wakeTime);
+                        if(dur >= 7 && dur <= 9) dEl.classList.add('completed');
+                        else if(dur >= 5) dEl.classList.add('partial');
+                        else dEl.classList.add('missed');
+                    }
+                    calendar.appendChild(dEl);
+                });
+            } else {
+                container.classList.remove('hidden'); calendar.classList.add('hidden');
+                if (charts.sleep) charts.sleep.destroy();
+                let days = getLast7Days();
+                let ctx = document.getElementById('sleepChart');
+                
+                if (type === 'deviation') {
+                    let dataWake = days.map(d => { if(!currentData.sleep[d]) return 0; let [h,m] = currentData.sleep[d].wakeTime.split(':').map(Number); return (h+m/60) - 6; });
+                    charts.sleep = new Chart(ctx, { type: 'bar', data: { labels: days.map(d=>d.slice(-2)), datasets: [{ label: 'Desviación Despertar (Hrs)', data: dataWake, backgroundColor: cColor }] }, options: { maintainAspectRatio:false, plugins: { legend: {display:false} } } });
+                } else if (type === 'accumulated') {
+                    let acc = 0;
+                    let dataAcc = days.map(d => { if(currentData.sleep[d]) acc += getSleepDuration(currentData.sleep[d].sleepTime, currentData.sleep[d].wakeTime); return acc; });
+                    charts.sleep = new Chart(ctx, { type: 'line', data: { labels: days.map(d=>d.slice(-2)), datasets: [{ label: 'Hrs Acumuladas', data: dataAcc, fill: true, backgroundColor: cColor+'40', borderColor: cColor }] }, options: { maintainAspectRatio:false, plugins: { legend: {display:false} } } });
+                }
+            }
+        }
+
+        // ================= 2. ESTUDIO =================
+        function updateStudy() {
+            let subj = document.getElementById('studySubjectSelect').value;
+            let hrs = parseFloat(document.getElementById('studyHours').value);
+            let perf = parseInt(document.getElementById('studyPerf').value);
+            if(!subj || isNaN(hrs)) return;
+            
+            let today = getDateKey();
+            if(!currentData.study[today]) currentData.study[today] = [];
+            currentData.study[today].push({ subject: subj, hours: hrs, performance: isNaN(perf)?5:perf });
+            saveData(); renderStudyChart();
+        }
+
+        function renderStudyChart() {
+            const type = document.getElementById('studyChartType').value;
+            if (charts.study) charts.study.destroy();
+            let days = getLast7Days();
+            let ctx = document.getElementById('studyChart');
+            let opts = { maintainAspectRatio: false, plugins: { legend: { labels:{color:'#fff', boxWidth:10} } }, scales:{ y:{beginAtZero:true} } };
+
+            if (type === 'stacked') {
+                opts.scales.x = { stacked: true }; opts.scales.y.stacked = true;
+                let datasets = currentData.studySubjects.map((subj, i) => {
+                    return {
+                        label: subj, backgroundColor: palette[i%palette.length],
+                        data: days.map(d => {
+                            if(!currentData.study[d]) return 0;
+                            return currentData.study[d].filter(s => s.subject === subj).reduce((sum, s)=>sum+s.hours, 0);
+                        })
+                    }
+                });
+                charts.study = new Chart(ctx, { type: 'bar', data: { labels: days.map(d=>d.slice(-2)), datasets }, options: opts });
+            } 
+            else if (type === 'accumulation') {
+                let acc = 0; let data = days.map(d => { if(currentData.study[d]) acc += currentData.study[d].reduce((sum, s)=>sum+s.hours, 0); return acc; });
+                opts.plugins.legend.display = false;
+                charts.study = new Chart(ctx, { type: 'line', data: { labels: days.map(d=>d.slice(-2)), datasets: [{ label: 'Horas Totales', data, fill:true, borderColor:currentData.themeColor, backgroundColor:currentData.themeColor+'40' }] }, options: opts });
+            }
+            else if (type === 'scatter') {
+                let scatterData = [];
+                Object.keys(currentData.study).forEach(d => { currentData.study[d].forEach(entry => { scatterData.push({ x: entry.hours, y: entry.performance }); }); });
+                opts.scales.x = { title: {display:true, text:'Horas', color:'#aaa'} }; opts.scales.y = { title: {display:true, text:'Rendimiento (1-10)', color:'#aaa'}, max:10 }; opts.plugins.legend.display = false;
+                charts.study = new Chart(ctx, { type: 'scatter', data: { datasets: [{ label:'Sesiones', data: scatterData, backgroundColor: currentData.themeColor }] }, options: opts });
+            }
+            else if (type === 'streaks') {
+                let d14 = Array.from({length:14}, (_,i) => { let d=getBaseDate(); d.setDate(d.getDate()-(13-i)); return getDateKey(d); });
+                let streakData = d14.map(d => currentData.study[d] && currentData.study[d].length > 0 ? 1 : 0);
+                opts.plugins.legend.display = false;
+                charts.study = new Chart(ctx, { type: 'bar', data: { labels: d14.map(d=>d.slice(-2)), datasets: [{ label:'Estudió', data:streakData, backgroundColor:currentData.themeColor }] }, options: opts });
+            }
+        }
+
+        // ================= 3. EJERCICIO =================
+        function updateExercise() {
+            let type = document.getElementById('exerciseTypeSelect').value;
+            let dur = parseFloat(document.getElementById('exDuration').value);
+            let metric = parseFloat(document.getElementById('exMetric').value);
+            if(!type || isNaN(dur)) return;
+            let today = getDateKey();
+            if(!currentData.exercise[today]) currentData.exercise[today] = [];
+            currentData.exercise[today].push({ type, duration: dur, metric: isNaN(metric)?0:metric });
+            saveData(); renderExerciseChart();
+        }
+
+        function renderExerciseChart() {
+            const type = document.getElementById('exerciseChartType').value;
+            if (charts.exercise) charts.exercise.destroy();
+            let days = getLast7Days();
+            let ctx = document.getElementById('exerciseChart');
+            let opts = { maintainAspectRatio: false, plugins: { legend: { labels:{color:'#fff', boxWidth:10} } } };
+
+            if(type === 'bar') {
+                let datasets = currentData.exerciseTypes.map((t, i) => {
+                    return { label: t, backgroundColor: palette[i%palette.length], data: days.map(d => { if(!currentData.exercise[d]) return 0; return currentData.exercise[d].filter(x => x.type === t).reduce((sum, x)=>sum+x.duration, 0); }) }
+                });
+                opts.scales = { x:{stacked:true}, y:{stacked:true} };
+                charts.exercise = new Chart(ctx, { type: 'bar', data: { labels: days.map(d=>d.slice(-2)), datasets }, options: opts });
+            }
+            else if(type === 'lineProgress') {
+                let data = days.map(d => { if(!currentData.exercise[d] || currentData.exercise[d].length===0) return 0; return Math.max(...currentData.exercise[d].map(x=>x.metric)); });
+                opts.plugins.legend.display = false;
+                charts.exercise = new Chart(ctx, { type: 'line', data: { labels: days.map(d=>d.slice(-2)), datasets: [{ label: 'Max Métrica', data, borderColor:currentData.themeColor, tension:0.3 }] }, options: opts });
+            }
+            else if(type === 'radarTypes') {
+                let totals = currentData.exerciseTypes.map(t => { let sum=0; Object.values(currentData.exercise).forEach(dayArr => { sum += dayArr.filter(x => x.type === t).reduce((s, x)=>s+x.duration, 0); }); return sum; });
+                opts.scales = { r: { ticks: {display:false}, pointLabels:{color:'#aaa'} } }; opts.plugins.legend.display = false;
+                charts.exercise = new Chart(ctx, { type: 'radar', data: { labels: currentData.exerciseTypes, datasets: [{ label:'Minutos Totales', data:totals, backgroundColor:currentData.themeColor+'60', borderColor:currentData.themeColor }] }, options: opts });
+            }
+            else if(type === 'frequency') {
+                let histDays = Array.from({length:28}, (_,i) => { let d=getBaseDate(); d.setDate(d.getDate()-(27-i)); return getDateKey(d); });
+                let weeks = [0,0,0,0];
+                histDays.forEach((d, i) => { if(currentData.exercise[d] && currentData.exercise[d].length > 0) weeks[Math.floor(i/7)]++; });
+                opts.scales = { y: {max:7} }; opts.plugins.legend.display = false;
+                charts.exercise = new Chart(ctx, { type: 'bar', data: { labels: ['Sem 1', 'Sem 2', 'Sem 3', 'Sem 4'], datasets: [{ label:'Días entrenados', data:weeks, backgroundColor:currentData.themeColor }] }, options: opts });
+            }
+        }
+
+        // ================= 4. LECTURA =================
+        function updateReadingGoal() { currentData.readingGoal = parseInt(document.getElementById('monthlyReadingGoal').value) || 500; saveData(); renderReadingChart(); }
+        function toggleBookStatus() {
+            let book = document.getElementById('bookSelector').value; let today = getDateKey();
+            if(!currentData.bookDates[book]) currentData.bookDates[book] = { start: today, end: null };
+            else if(!currentData.bookDates[book].end) currentData.bookDates[book].end = today;
+            else currentData.bookDates[book] = { start: today, end: null };
+            saveData(); renderReadingChart(); alert(`Estado de ${book} actualizado.`);
+        }
+        function updateReading() {
+            let book = document.getElementById('bookSelector').value; let pages = parseInt(document.getElementById('pagesRead').value);
+            if(!book || isNaN(pages)) return;
+            let today = getDateKey();
+            if(!currentData.reading[today]) currentData.reading[today] = {};
+            currentData.reading[today][book] = (currentData.reading[today][book] || 0) + pages;
+            saveData(); renderReadingChart();
+        }
+
+        function renderReadingChart() {
+            const type = document.getElementById('readingChartType').value;
+            if (charts.reading) charts.reading.destroy();
+            let days = getLast7Days(); let ctx = document.getElementById('readingChart');
+            let opts = { maintainAspectRatio: false, plugins: { legend: { labels:{color:'#fff', boxWidth:10} } } };
+
+            if(type === 'bar' || type === 'area') {
+                let datasets = currentData.books.map((b, i) => {
+                    let color = palette[i%palette.length];
+                    let data = days.map(d => (currentData.reading[d] && currentData.reading[d][b]) ? currentData.reading[d][b] : 0);
+                    if(type === 'area') { let acc = 0; data = data.map(val => { acc += val; return acc; }); }
+                    return { label: b, data, backgroundColor: type==='area' ? color+'40' : color, borderColor: color, fill: type==='area', tension:0.3 };
+                });
+                opts.scales = { x: {stacked: type==='bar'}, y: {stacked: type==='bar'} };
+                charts.reading = new Chart(ctx, { type: type==='area'?'line':'bar', data: { labels: days.map(d=>d.slice(-2)), datasets }, options: opts });
+            }
+            else if(type === 'goalVsActual') {
+                let totalMonth = 0; getMonthDays().forEach(d => { if(currentData.reading[d]) Object.values(currentData.reading[d]).forEach(p => totalMonth+=p); });
+                opts.plugins.legend.display = false;
+                charts.reading = new Chart(ctx, { type: 'doughnut', data: { labels: ['Leído', 'Restante'], datasets: [{ data: [totalMonth, Math.max(0, currentData.readingGoal - totalMonth)], backgroundColor: [currentData.themeColor, '#2a2a2a'] }] }, options: opts });
+            }
+            else if(type === 'timeline') {
+                let labels = Object.keys(currentData.bookDates);
+                let data = labels.map(b => {
+                    let s = new Date(currentData.bookDates[b].start).getDate();
+                    let e = currentData.bookDates[b].end ? new Date(currentData.bookDates[b].end).getDate() : new Date().getDate();
+                    return [s, e];
+                });
+                opts.indexAxis = 'y'; opts.plugins.legend.display = false;
+                charts.reading = new Chart(ctx, { type: 'bar', data: { labels, datasets: [{ data, backgroundColor: currentData.themeColor }] }, options: opts });
+            }
+        }
+
+        // ================= 5. CUIDADO PERSONAL =================
+        function updatePersonalCare() {
+            let today = getDateKey();
+            currentData.personalCare[today] = {
+                ducha: document.getElementById('care_ducha').checked,
+                cara: document.getElementById('care_cara').checked,
+                dientes_m: document.getElementById('care_dientes_m').checked,
+                dientes_t: document.getElementById('care_dientes_t').checked,
+                dientes_n: document.getElementById('care_dientes_n').checked,
+                skin: document.getElementById('care_skin').checked
+            };
+            saveData(); renderPersonalCareChart();
+        }
+
+        function renderPersonalCareChart() {
+            const type = document.getElementById('careChartType').value;
+            const container = document.getElementById('personalCareChartContainer');
+            const calendar = document.getElementById('personalCareCalendar');
+            let todayObj = currentData.personalCare[getDateKey()] || {};
+            let cColor = currentData.themeColor;
+
+            // Restablecer el estado de los checkboxes
+            ['ducha','cara','dientes_m','dientes_t','dientes_n','skin'].forEach(k => {
+                document.getElementById(`care_${k}`).checked = !!todayObj[k];
+            });
+
+            if (type === 'calendar') {
+                container.classList.add('hidden'); calendar.classList.remove('hidden');
+                calendar.innerHTML = '';
+                getMonthDays().forEach((dKey, i) => {
+                    let dEl = document.createElement('div'); dEl.className = 'heat-day'; dEl.textContent = i+1;
+                    let o = currentData.personalCare[dKey];
+                    if(o) {
+                        let score = (o.ducha?1:0) + (o.cara?1:0) + (o.dientes_m?1:0) + (o.dientes_t?1:0) + (o.dientes_n?1:0) + (o.skin?1:0);
+                        if(score === 6) dEl.classList.add('completed');
+                        else if(score > 0) dEl.classList.add('partial');
+                        else dEl.classList.add('missed');
+                    }
+                    calendar.appendChild(dEl);
+                });
+            } else {
+                container.classList.remove('hidden'); calendar.classList.add('hidden');
+                if (charts.personalCare) charts.personalCare.destroy();
+                let ctx = document.getElementById('personalCareChart');
+                let days = getLast7Days();
+                
+                if (type === 'radar') {
+                    // Contar cuántas veces se hizo cada hábito en los últimos 7 días
+                    let totals = {ducha:0, cara:0, dientes_m:0, dientes_t:0, dientes_n:0, skin:0};
+                    days.forEach(d => {
+                        let o = currentData.personalCare[d];
+                        if(o) {
+                            if(o.ducha) totals.ducha++; if(o.cara) totals.cara++;
+                            if(o.dientes_m) totals.dientes_m++; if(o.dientes_t) totals.dientes_t++;
+                            if(o.dientes_n) totals.dientes_n++; if(o.skin) totals.skin++;
+                        }
+                    });
+
+                    charts.personalCare = new Chart(ctx, {
+                        type: 'radar',
+                        data: {
+                            labels: ['Ducha', 'Cara', 'Dientes ☀️', 'Dientes 🌤️', 'Dientes 🌙', 'Skin Care'],
+                            datasets: [{
+                                label: 'Veces (últimos 7 días)',
+                                data: [totals.ducha, totals.cara, totals.dientes_m, totals.dientes_t, totals.dientes_n, totals.skin],
+                                backgroundColor: cColor + '60',
+                                borderColor: cColor,
+                                pointBackgroundColor: cColor
+                            }]
+                        },
+                        options: {
+                            maintainAspectRatio: false,
+                            scales: {
+                                r: {
+                                    beginAtZero: true, max: 7, ticks: { display: false },
+                                    pointLabels: { color: '#e0e0e0', font: { size: 10 } },
+                                    grid: { color: '#2a2a2a' }, angleLines: { color: '#2a2a2a' }
+                                }
+                            },
+                            plugins: { legend: { display: false } }
+                        }
+                    });
+                }
+                else if(type === 'compliance') {
+                    let compData = days.map(d => {
+                        let o = currentData.personalCare[d]; if(!o) return 0;
+                        let score = (o.ducha?1:0) + (o.cara?1:0) + (o.dientes_m?1:0) + (o.dientes_t?1:0) + (o.dientes_n?1:0) + (o.skin?1:0);
+                        return (score / 6) * 100;
+                    });
+                    charts.personalCare = new Chart(ctx, { type: 'line', data: { labels: days.map(d=>d.slice(-2)), datasets: [{ label:'% Cumplimiento', data: compData, borderColor: cColor, tension:0.3 }] }, options: { maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{max:100}} } });
+                }
+            }
+        }
+
+        // ================= 6. HOBBIES =================
+        function renderHobbiesInputs() {
+            let cont = document.getElementById('hobbiesInputs');
+            cont.innerHTML = currentData.hobbiesList.map((h, i) => {
+                let val = (currentData.hobbies[getDateKey()] || {})[h] || '';
+                return `<div class="flex-input" style="margin:0;"><label style="width:70px; font-size:0.8em; overflow:hidden; text-overflow:ellipsis;">${h}</label><input type="number" id="hob_${i}" value="${val}" style="padding:4px;"><button onclick="updateHobby('${h}', ${i})" style="padding:4px 8px;">✓</button></div>`;
+            }).join('');
+        }
+        function updateHobby(hName, idx) {
+            let min = parseInt(document.getElementById(`hob_${idx}`).value);
+            if(isNaN(min)) return;
+            let today = getDateKey();
+            if(!currentData.hobbies[today]) currentData.hobbies[today] = {};
+            currentData.hobbies[today][hName] = min;
+            saveData(); renderHobbiesChart();
+        }
+
+        function renderHobbiesChart() {
+            renderHobbiesInputs();
+            const type = document.getElementById('hobbiesChartType').value;
+            if (charts.hobbies) charts.hobbies.destroy();
+            let days = getLast7Days(); let ctx = document.getElementById('hobbiesChart');
+            let opts = { maintainAspectRatio: false, plugins: { legend: { display: type==='radar'||type==='bar', position:'bottom', labels:{color:'#fff', boxWidth:10} } } };
+
+            if(type === 'bar' || type === 'radar') {
+                let datasets = currentData.hobbiesList.map((h, i) => {
+                    let color = palette[i%palette.length];
+                    return { label: h, data: days.map(d => (currentData.hobbies[d] || {})[h] || 0), backgroundColor: type==='radar'?color+'40':color, borderColor: color };
+                });
+                if(type === 'radar') opts.scales = { r:{ticks:{display:false}, pointLabels:{color:'#aaa'}} };
+                else opts.scales = { x:{stacked:true}, y:{stacked:true} };
+                charts.hobbies = new Chart(ctx, { type, data: { labels: days.map(d=>d.slice(-2)), datasets }, options: opts });
+            }
+            else if(type === 'variety') {
+                let data = days.map(d => Object.keys(currentData.hobbies[d]||{}).length);
+                charts.hobbies = new Chart(ctx, { type: 'bar', data: { labels: days.map(d=>d.slice(-2)), datasets: [{ label:'Cant. Hobbies', data, backgroundColor:currentData.themeColor }] }, options: opts });
+            }
+            else if(type === 'timeline') {
+                let scatterData = [];
+                days.forEach((d, dIdx) => { currentData.hobbiesList.forEach((h, hIdx) => { if((currentData.hobbies[d]||{})[h] > 0) scatterData.push({x: dIdx, y: hIdx, r: Math.min((currentData.hobbies[d][h])/5, 15) + 5}); }); });
+                opts.scales = { x:{ticks:{callback: v=>days[v]?days[v].slice(-2):''}}, y:{ticks:{callback: v=>currentData.hobbiesList[v]||''}} };
+                charts.hobbies = new Chart(ctx, { type: 'bubble', data: { datasets: [{ label:'Timeline', data: scatterData, backgroundColor: currentData.themeColor+'80' }] }, options: opts });
+            }
+        }
+
+        // ================= ADICIONALES =================
+        function renderAdditionalView() {
+            const renderList = (id, listName) => {
+                document.getElementById(id).innerHTML = currentData[listName].map((item, i) => 
+                    `<div class="item-tag">${item} <button onclick="removeListItem('${listName}', ${i})">×</button></div>`
+                ).join('');
+            };
+            renderList('subjectsList', 'studySubjects'); renderList('exerciseTypesList', 'exerciseTypes');
+            renderList('booksList', 'books'); renderList('hobbiesAdminList', 'hobbiesList');
+        }
+
+        function addListItem(listName, inputId) {
+            let val = document.getElementById(inputId).value.trim();
+            if(val && !currentData[listName].includes(val)) { currentData[listName].push(val); document.getElementById(inputId).value = ''; saveData(); renderAdditionalView(); updateSelectors(); }
+        }
+        function removeListItem(listName, idx) { currentData[listName].splice(idx, 1); saveData(); renderAdditionalView(); updateSelectors(); }
+
+        function renderAllViews() {
+            renderSleepChart(); renderStudyChart(); renderExerciseChart(); 
+            renderReadingChart(); renderPersonalCareChart(); renderHobbiesChart();
+        }
+
+        function resetHabitData(h) { if(confirm('¿Limpiar datos?')){ currentData[h]={}; saveData(); renderAllViews(); } }
+
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
