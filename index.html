@@ -3,12 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Board Tracker - Seguimiento de Hábitos</title>
+    <title>Board Tracker Pro - Análisis de Hábitos</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <style>
         :root {
             --theme-color: #00ff88;
             --theme-color-transparent: rgba(0, 255, 136, 0.4);
+            --danger-color: #ff4757;
+            --warning-color: #ffa502;
+            --neutral-color: #747d8c;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -24,14 +28,14 @@
             padding: 10px; display: flex; flex-direction: column;
         }
 
-        /* Header y Navegación (Optimizado) */
+        /* Header y Navegación */
         .header {
             background: #1a1a1a; padding: 8px 15px; border-radius: 8px;
             margin-bottom: 10px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
             display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
-            height: 55px; /* Altura controlada */
+            height: 55px; border-bottom: 2px solid var(--theme-color);
         }
-        .header h1 { color: var(--theme-color); font-size: 1.2em; }
+        .header h1 { color: var(--theme-color); font-size: 1.2em; display:flex; align-items:center; }
         .nav-buttons { display: flex; gap: 8px; align-items: center; }
         .nav-btn {
             padding: 6px 12px; border: none; border-radius: 6px;
@@ -40,59 +44,40 @@
         }
         .nav-btn:hover { background: var(--theme-color); color: #0a0a0a; }
         .nav-btn.active { background: var(--theme-color); color: #0a0a0a; box-shadow: 0 0 10px var(--theme-color-transparent); }
-        .time-warning { background: #ffd93d; color: #000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.8em; display: none; }
-        .status-dot { height: 10px; width: 10px; background-color: #ff6b6b; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .time-warning { background: var(--warning-color); color: #000; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 0.8em; display: none; }
+        .status-dot { height: 10px; width: 10px; background-color: var(--danger-color); border-radius: 50%; display: inline-block; margin-left: 10px; }
         .status-dot.active { background-color: var(--theme-color); box-shadow: 0 0 8px var(--theme-color); }
 
-        /* Vista Principal Optimizada para 1280x800 */
+        /* Vista Principal */
         .main-view {
-            display: grid; 
-            grid-template-columns: repeat(3, 1fr); 
-            grid-template-rows: repeat(2, 1fr); /* Fuerza 2 filas exactas */
-            gap: 10px;
-            flex: 1; 
-            overflow: hidden; /* Evita el scroll global */
-            height: calc(100vh - 75px); 
+            display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); 
+            gap: 10px; flex: 1; overflow: hidden; height: calc(100vh - 75px); 
         }
 
         .habit-card {
             background: #1a1a1a; padding: 12px; border-radius: 8px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5); border: 1px solid #2a2a2a;
-            display: flex; flex-direction: column; 
-            height: 100%; /* Toma todo el espacio de su celda */
-            overflow: hidden;
+            display: flex; flex-direction: column; height: 100%; overflow: hidden;
         }
         .habit-card h2 {
             color: var(--theme-color); margin-bottom: 8px; font-size: 1em;
-            display: flex; justify-content: space-between; align-items: center;
-            flex-shrink: 0;
+            display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
         }
 
-        /* Controles */
         .chart-controls { display: flex; gap: 5px; font-size: 0.8em; }
         .chart-type-select {
             background: #2a2a2a; color: var(--theme-color); border: 1px solid var(--theme-color);
             border-radius: 4px; padding: 3px 6px; cursor: pointer; font-size: 0.85em;
         }
         .control-btn {
-            background: #2a2a2a; color: #ff6b6b; border: 1px solid #ff6b6b;
+            background: #2a2a2a; color: var(--danger-color); border: 1px solid var(--danger-color);
             border-radius: 4px; padding: 3px 6px; cursor: pointer;
         }
-        .control-btn:hover { background: #ff6b6b; color: #0a0a0a; }
+        .control-btn:hover { background: var(--danger-color); color: #0a0a0a; }
 
-        /* Contenedor de Gráficas: La clave del Responsive */
-        .chart-container { 
-            position: relative; 
-            flex: 1 1 0; /* Permite que se estire o se encoja */
-            min-height: 0; /* CRUCIAL: Deja que flexbox lo reduzca si falta espacio */
-            width: 100%; 
-            margin-top: 5px; 
-        }
+        .chart-container { position: relative; flex: 1 1 0; min-height: 0; width: 100%; margin-top: 5px; }
 
-        .daily-check {
-            background: #0f0f0f; padding: 8px; border-radius: 6px; margin-bottom: 5px; 
-            border: 1px solid #2a2a2a; flex-shrink: 0;
-        }
+        .daily-check { background: #0f0f0f; padding: 8px; border-radius: 6px; margin-bottom: 5px; border: 1px solid #2a2a2a; flex-shrink: 0; }
         .daily-check summary { font-size: 0.85em; color: var(--theme-color); cursor: pointer; font-weight: bold; outline: none; user-select: none; }
         
         .checkbox-container { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
@@ -106,9 +91,10 @@
             display: flex; align-items: center; justify-content: center; font-size: 0.8em;
             cursor: pointer; color: #606060; max-width: 30px; max-height: 30px; margin: 0 auto; width: 100%;
         }
-        .heat-day.completed { background: var(--theme-color); color: #0a0a0a; border-color: var(--theme-color); font-weight: bold;}
-        .heat-day.partial { background: #ffd93d; color: #0a0a0a; border-color: #ffd93d; font-weight: bold;}
-        .heat-day.missed { background: #ff6b6b; color: white; border-color: #ff6b6b; }
+        .heat-day.good { background: #2ecc71; color: #000; border-color: #27ae60; font-weight: bold;}
+        .heat-day.ok { background: #f1c40f; color: #000; border-color: #f39c12; font-weight: bold;}
+        .heat-day.bad { background: #e74c3c; color: #fff; border-color: #c0392b; font-weight: bold;}
+        .heat-day.empty { background: #1a1a1a; color: #555; }
 
         /* Inputs */
         .flex-input { display: flex; gap: 6px; align-items: center; margin: 5px 0; }
@@ -133,7 +119,7 @@
             background: #2a2a2a; color: var(--theme-color); padding: 4px 10px; border-radius: 20px;
             display: flex; align-items: center; gap: 6px; border: 1px solid var(--theme-color); font-size: 0.85em;
         }
-        .item-tag button { background: rgba(255, 107, 107, 0.3); border: none; color: #ff6b6b; cursor: pointer; border-radius: 50%; padding: 0 5px; }
+        .item-tag button { background: rgba(255, 107, 107, 0.3); border: none; color: var(--danger-color); cursor: pointer; border-radius: 50%; padding: 0 5px; }
 
         .hidden { display: none !important; }
     </style>
@@ -141,11 +127,11 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>📊 Board Tracker <span id="wakeLockStatus" class="status-dot" title="Anti-hibernación Activo"></span></h1>
+            <h1>📊 Board Tracker Pro <span id="wakeLockStatus" class="status-dot" title="Anti-hibernación Activo"></span></h1>
             <div class="nav-buttons">
                 <span id="timeWarning" class="time-warning">⏳ Editando fecha pasada</span>
                 <button class="nav-btn active" onclick="showView('main')">Principal</button>
-                <button class="nav-btn" onclick="showView('additional')">Config. y Adicionales</button>
+                <button class="nav-btn" onclick="showView('additional')">Configuraciones</button>
                 <button class="nav-btn" onclick="showView('history')">Historial</button>
             </div>
         </div>
@@ -156,9 +142,9 @@
                 <h2>😴 Salud de Sueño
                     <div class="chart-controls">
                         <select class="chart-type-select" id="sleepChartType" onchange="renderSleepChart()">
-                            <option value="calendar">Heatmap</option>
-                            <option value="deviation">Desviación vs Ideal</option>
-                            <option value="accumulated">Área Acumulada</option>
+                            <option value="calendar">Heatmap Intuitivo</option>
+                            <option value="deviation">Desviación ([-3, +3]h)</option>
+                            <option value="accumulated">Acumulada vs Meta</option>
                         </select>
                         <button class="control-btn" onclick="resetHabitData('sleep')">🗑️</button>
                     </div>
@@ -166,12 +152,12 @@
                 <details class="daily-check" id="sleepDetails" open>
                     <summary>✨ Registrar Sueño</summary>
                     <div class="flex-input">
-                        <label style="font-size:0.8em; color:#aaa;">Me dormí a las:</label>
-                        <input type="time" id="sleepTimeIn">
+                        <label style="font-size:0.8em; color:var(--neutral-color);">Me dormí a las:</label>
+                        <input type="time" id="sleepTimeIn" value="23:50">
                     </div>
                     <div class="flex-input">
-                        <label style="font-size:0.8em; color:#aaa;">Me desperté a las:</label>
-                        <input type="time" id="wakeTimeIn">
+                        <label style="font-size:0.8em; color:var(--neutral-color);">Me desperté a las:</label>
+                        <input type="time" id="wakeTimeIn" value="06:00">
                         <button onclick="updateSleep()">Guardar</button>
                     </div>
                 </details>
@@ -184,9 +170,8 @@
                     <div class="chart-controls">
                         <select class="chart-type-select" id="studyChartType" onchange="renderStudyChart()">
                             <option value="stacked">Barras por Materia</option>
-                            <option value="accumulation">Curva Acumulación</option>
-                            <option value="streaks">Rachas (Streaks)</option>
-                            <option value="scatter">Rendimiento</option>
+                            <option value="accumulation">Curva + Tendencia</option>
+                            <option value="scatter">Rendimiento (Burbujas)</option>
                         </select>
                         <button class="control-btn" onclick="resetHabitData('study')">🗑️</button>
                     </div>
@@ -195,11 +180,11 @@
                     <summary>✨ Registrar Estudio</summary>
                     <div class="flex-input">
                         <select id="studySubjectSelect"></select>
-                        <input type="number" id="studyHours" placeholder="Horas" step="0.5">
+                        <input type="number" id="studyHours" placeholder="Horas" step="0.5" min="0">
                     </div>
                     <div class="flex-input">
                         <input type="number" id="studyPerf" placeholder="Rend. (1-10)" min="1" max="10">
-                        <button onclick="updateStudy()">Registrar</button>
+                        <button onclick="updateStudy()">Corregir/Guardar</button>
                     </div>
                 </details>
                 <div class="chart-container"><canvas id="studyChart"></canvas></div>
@@ -210,9 +195,9 @@
                     <div class="chart-controls">
                         <select class="chart-type-select" id="exerciseChartType" onchange="renderExerciseChart()">
                             <option value="bar">Duración</option>
-                            <option value="lineProgress">Progreso (Métrica)</option>
+                            <option value="lineProgress">Progreso Relativo (%)</option>
                             <option value="radarTypes">Radar Tipos</option>
-                            <option value="frequency">Frecuencia</option>
+                            <option value="frequency">Frecuencia por Semana</option>
                         </select>
                         <button class="control-btn" onclick="resetHabitData('exercise')">🗑️</button>
                     </div>
@@ -221,11 +206,11 @@
                     <summary>✨ Registrar Entrenamiento</summary>
                     <div class="flex-input">
                         <select id="exerciseTypeSelect"></select>
-                        <input type="number" id="exDuration" placeholder="Mins">
+                        <input type="number" id="exDuration" placeholder="Mins" min="0">
                     </div>
                     <div class="flex-input">
-                        <input type="number" id="exMetric" placeholder="Métrica (Ej: Kg)">
-                        <button onclick="updateExercise()">Registrar</button>
+                        <input type="number" id="exMetric" placeholder="Métrica Absoluta" min="0">
+                        <button onclick="updateExercise()">Corregir/Guardar</button>
                     </div>
                 </details>
                 <div class="chart-container"><canvas id="exerciseChart"></canvas></div>
@@ -235,10 +220,9 @@
                 <h2>📖 Lectura
                     <div class="chart-controls">
                         <select class="chart-type-select" id="readingChartType" onchange="renderReadingChart()">
-                            <option value="bar">Páginas/día</option>
-                            <option value="area">Acumulativa</option>
-                            <option value="goalVsActual">Meta Mensual</option>
-                            <option value="timeline">Timeline Libros</option>
+                            <option value="area">Páginas/día (Área)</option>
+                            <option value="goalVsActual">Meta Gauge</option>
+                            <option value="timeline">Gantt de Libros</option>
                         </select>
                         <button class="control-btn" onclick="resetHabitData('reading')">🗑️</button>
                     </div>
@@ -247,8 +231,8 @@
                     <summary>✨ Avance de hoy</summary>
                     <div class="flex-input">
                         <select id="bookSelector"></select>
-                        <input type="number" id="pagesRead" placeholder="Págs">
-                        <button onclick="updateReading()">Registrar</button>
+                        <input type="number" id="pagesRead" placeholder="Págs" min="0">
+                        <button onclick="updateReading()">Corregir/Guardar</button>
                     </div>
                     <div class="flex-input">
                         <button style="width:100%;" onclick="toggleBookStatus()">📚 Marcar Inicio/Fin de Libro</button>
@@ -261,8 +245,8 @@
                 <h2>✨ Cuidado Personal
                     <div class="chart-controls">
                         <select class="chart-type-select" id="careChartType" onchange="renderPersonalCareChart()">
-                            <option value="radar">Gráfico Radar</option>
-                            <option value="compliance">Cumplimiento (%)</option>
+                            <option value="radar">Radar Normalizado</option>
+                            <option value="compliance">Bandas de Cumplimiento</option>
                             <option value="calendar">Heatmap</option>
                         </select>
                         <button class="control-btn" onclick="resetHabitData('personalCare')">🗑️</button>
@@ -287,10 +271,9 @@
                 <h2>🎸 Hobbies
                     <div class="chart-controls">
                         <select class="chart-type-select" id="hobbiesChartType" onchange="renderHobbiesChart()">
-                            <option value="bar">Tiempo</option>
-                            <option value="variety">Variedad</option>
-                            <option value="timeline">Timeline</option>
-                            <option value="radar">Radar</option>
+                            <option value="bar">Tiempo Absoluto</option>
+                            <option value="variety">Índice Variedad</option>
+                            <option value="radar">Spider Chart</option>
                         </select>
                         <button class="control-btn" onclick="resetHabitData('hobbies')">🗑️</button>
                     </div>
@@ -308,20 +291,20 @@
         </div>
 
         <div id="additionalView" class="additional-view hidden">
-            <div class="config-section" style="border-color: #ffd93d;">
-                <h2 style="color: #ffd93d;">⏳ Máquina del Tiempo (Editar días pasados)</h2>
-                <p style="color:#aaa; font-size:0.85em; margin-bottom:10px;">Selecciona una fecha para viajar a ese día. Edita en la pestaña Principal y luego borra la fecha aquí para volver a Hoy.</p>
+            <div class="config-section" style="border-color: var(--warning-color);">
+                <h2 style="color: var(--warning-color);">⏳ Máquina del Tiempo</h2>
+                <p style="color:var(--neutral-color); font-size:0.85em; margin-bottom:10px;">Selecciona una fecha para viajar a ese día. Edita en la pestaña Principal y luego borra la fecha aquí para volver.</p>
                 <div class="flex-input">
-                    <input type="date" id="timeMachineDate" style="background: #2a2a0a; border-color: #ffd93d;" onchange="updateTimeMachine()">
-                    <button style="background: #1a1a1a; color: #ffd93d; border-color: #ffd93d;" onclick="resetTimeMachine()">Volver a Hoy</button>
+                    <input type="date" id="timeMachineDate" style="background: #2a2a0a; border-color: var(--warning-color);" onchange="updateTimeMachine()">
+                    <button style="background: #1a1a1a; color: var(--warning-color); border-color: var(--warning-color);" onclick="resetTimeMachine()">Volver a Hoy</button>
                 </div>
             </div>
 
             <div class="config-section">
-                <h2>🎨 Apariencia</h2>
+                <h2>🎨 Apariencia Global</h2>
                 <div class="flex-input">
-                    <label style="color: #b0b0b0;">Color Principal:</label>
-                    <input type="color" id="themeColorPicker" value="#00ff88" onchange="updateThemeColor()" style="border:none; height:35px; width:50px; cursor:pointer; background:transparent;">
+                    <label style="color: var(--neutral-color);">Color Principal:</label>
+                    <input type="color" id="themeColorPicker" value="#00ff88" onchange="applyThemeColor(this.value)" style="border:none; height:35px; width:50px; cursor:pointer; background:transparent;">
                 </div>
             </div>
             
@@ -337,7 +320,10 @@
                     <div class="item-list" id="exerciseTypesList"></div>
                 </div>
                 <div class="config-section">
-                    <h2>📖 Libros (Meta: <input type="number" id="monthlyReadingGoal" style="width:60px; background:transparent; border:none; color:var(--theme-color); font-weight:bold;" onchange="updateReadingGoal()"> págs)</h2>
+                    <h2>📖 Meta Libros (Págs/mes)</h2>
+                    <div class="flex-input">
+                        <input type="number" id="monthlyReadingGoal" onchange="updateReadingGoal()">
+                    </div>
                     <div class="flex-input"><input type="text" id="bookInput"><button onclick="addListItem('books', 'bookInput')">+</button></div>
                     <div class="item-list" id="booksList"></div>
                 </div>
@@ -350,13 +336,39 @@
         </div>
 
         <div id="historyView" class="additional-view hidden">
-            <h2>📅 Historial</h2><p style="color:#b0b0b0;">Los meses archivados aparecerán aquí.</p><div id="monthsHistory"></div>
+            <h2>📅 Historial</h2><p style="color:var(--neutral-color);">Los meses archivados aparecerán aquí.</p><div id="monthsHistory"></div>
         </div>
     </div>
 
     <script>
-        const DATA_KEY = 'habitTrackerDataFull';
-        const palette = ['#FF6B6B', '#4D96FF', '#6BCB77', '#FFD93D', '#9B5DE5', '#F15BB5', '#00BBF9', '#FEE440'];
+        // Registrar Plugin Global de DataLabels
+        Chart.register(ChartDataLabels);
+        Chart.defaults.set('plugins.datalabels', {
+            color: '#ffffff', font: { size: 10, weight: 'bold' },
+            display: function(context) { return context.dataset.data[context.dataIndex] > 0; },
+            formatter: Math.round
+        });
+
+        // Plugin Gauge Lectura
+        const centerTextPlugin = {
+            id: 'centerText',
+            beforeDraw: function(chart) {
+                if (chart.config.type !== 'doughnut' || !chart.config.options.plugins.centerText) return;
+                var width = chart.width, height = chart.height, ctx = chart.ctx;
+                ctx.restore();
+                var fontSize = (height / 120).toFixed(2);
+                ctx.font = "bold " + fontSize + "em sans-serif";
+                ctx.textBaseline = "middle";
+                ctx.fillStyle = chart.config.options.plugins.centerText.color || "#e0e0e0";
+                var text = chart.config.options.plugins.centerText.text, textX = Math.round((width - ctx.measureText(text).width) / 2), textY = height / 2;
+                ctx.fillText(text, textX, textY);
+                ctx.save();
+            }
+        };
+        Chart.register(centerTextPlugin);
+
+        const DATA_KEY = 'habitTrackerDataFullPro';
+        const palette = ['#4D96FF', '#6BCB77', '#FFD93D', '#9B5DE5', '#F15BB5', '#00BBF9', '#FF6B6B', '#FEE440'];
         let charts = {};
         let timeMachineActiveDate = null;
         
@@ -367,27 +379,50 @@
             books: ['Libro 1', 'Libro 2'], hobbiesList: ['Guitarra', 'Pintura'], readingGoal: 500
         };
 
-        // ================= ANTI HIBERNACIÓN (VIDEO HACK INDESTRUCTIBLE) =================
+        // ================= ANTI HIBERNACIÓN (VIDEO INDESTRUCTIBLE) =================
         function startVideoHack() {
             const canvas = document.createElement('canvas');
             canvas.width = 1; canvas.height = 1;
-            canvas.getContext('2d').fillRect(0, 0, 1, 1);
-            const stream = canvas.captureStream(1);
+            const ctx = canvas.getContext('2d');
+            
+            // Forzar actividad constante en el canvas para que el stream nunca se detenga
+            function draw() {
+                ctx.fillStyle = Math.random() > 0.5 ? '#000' : '#111';
+                ctx.fillRect(0,0,1,1);
+                requestAnimationFrame(draw);
+            }
+            draw();
+
+            const stream = canvas.captureStream(30); 
             const video = document.createElement('video');
-            video.srcObject = stream; video.muted = true; video.playsInline = true;
-            video.style.display = 'none';
+            video.srcObject = stream; 
+            video.muted = true; 
+            video.playsInline = true; 
+            video.loop = true; 
+            
+            // Para engañar a los navegadores estrictos, el video no debe tener display:none
+            // Lo ponemos posicionado fuera de la pantalla.
+            video.style.position = 'fixed';
+            video.style.top = '-1000px';
+            video.style.width = '1px';
+            video.style.height = '1px';
+            video.style.opacity = '0.01';
+            document.body.appendChild(video);
+            
             video.play().then(() => {
                 document.getElementById('wakeLockStatus').classList.add('active');
             }).catch(e => {
-                window.addEventListener('click', () => { video.play(); document.getElementById('wakeLockStatus').classList.add('active'); }, {once: true});
+                window.addEventListener('click', () => { 
+                    video.play(); 
+                    document.getElementById('wakeLockStatus').classList.add('active'); 
+                }, {once: true});
             });
-            document.body.appendChild(video);
         }
 
-        // ================= INICIALIZACIÓN =================
+        // ================= INICIALIZACIÓN Y UTILIDADES =================
         function init() {
             loadData(); startVideoHack();
-            applyThemeColor(currentData.themeColor);
+            applyThemeColor(currentData.themeColor); // Forzamos el color inicial
             updateSelectors(); renderAllViews();
         }
 
@@ -428,8 +463,12 @@
         }
 
         function applyThemeColor(color) {
-            document.documentElement.style.setProperty('--theme-color', color); document.documentElement.style.setProperty('--theme-color-transparent', color+'40');
-            document.getElementById('themeColorPicker').value = color; currentData.themeColor = color; saveData();
+            document.documentElement.style.setProperty('--theme-color', color); 
+            document.documentElement.style.setProperty('--theme-color-transparent', color+'40');
+            document.getElementById('themeColorPicker').value = color; 
+            currentData.themeColor = color; saveData();
+            
+            // Forzar renderizado completo para aplicar el color a los Canvas existentes
             if(!document.getElementById('mainView').classList.contains('hidden')) renderAllViews();
         }
 
@@ -440,86 +479,114 @@
         }
         function renderSleepChart() {
             let tObj = currentData.sleep[getDateKey()];
-            document.getElementById('sleepTimeIn').value = tObj ? tObj.sleepTime : ''; document.getElementById('wakeTimeIn').value = tObj ? tObj.wakeTime : '';
-            const type = document.getElementById('sleepChartType').value;
-            const cont = document.getElementById('sleepChartContainer'), cal = document.getElementById('sleepCalendar');
+            document.getElementById('sleepTimeIn').value = tObj ? tObj.sleepTime : '23:50'; document.getElementById('wakeTimeIn').value = tObj ? tObj.wakeTime : '06:00';
+            const type = document.getElementById('sleepChartType').value, cont = document.getElementById('sleepChartContainer'), cal = document.getElementById('sleepCalendar');
+            let cColor = currentData.themeColor;
+            
             if (type === 'calendar') {
                 cont.classList.add('hidden'); cal.classList.remove('hidden'); cal.innerHTML = '';
                 getMonthDays().forEach((dKey, i) => {
                     let dEl = document.createElement('div'); dEl.className = 'heat-day'; dEl.textContent = i+1;
                     if(currentData.sleep[dKey]) {
                         let [sh,sm] = currentData.sleep[dKey].sleepTime.split(':').map(Number), [wh,wm] = currentData.sleep[dKey].wakeTime.split(':').map(Number);
-                        let dur = (wh+wm/60)-(sh+sm/60); if(dur<0) dur+=24;
-                        if(dur >= 7 && dur <= 9) dEl.classList.add('completed'); else if(dur >= 5) dEl.classList.add('partial'); else dEl.classList.add('missed');
-                    }
+                        let sTime = sh + sm/60; if(sTime < 12) sTime += 24;
+                        let wTime = wh + wm/60;
+                        let penalty = Math.abs(sTime - 23.83) + Math.abs(wTime - 6.0);
+                        if(penalty <= 1.5) dEl.classList.add('good'); else if(penalty <= 3.5) dEl.classList.add('ok'); else dEl.classList.add('bad');
+                    } else dEl.classList.add('empty');
                     cal.appendChild(dEl);
                 });
             } else {
                 cont.classList.remove('hidden'); cal.classList.add('hidden'); if (charts.sleep) charts.sleep.destroy();
                 let days = getLast7Days(), ctx = document.getElementById('sleepChart');
                 if (type === 'deviation') {
-                    let dataWake = days.map(d => { if(!currentData.sleep[d]) return 0; let [h,m] = currentData.sleep[d].wakeTime.split(':').map(Number); return (h+m/60)-6; });
-                    charts.sleep = new Chart(ctx, { type: 'bar', data: { labels: days.map(d=>d.slice(-2)), datasets: [{ label: 'Desv. Despertar (Hrs)', data: dataWake, backgroundColor: currentData.themeColor }] }, options: { maintainAspectRatio:false, plugins: { legend: {display:false} } } });
+                    let dataWake = days.map(d => { if(!currentData.sleep[d]) return null; let [h,m] = currentData.sleep[d].wakeTime.split(':').map(Number); return (h+m/60)-6; });
+                    charts.sleep = new Chart(ctx, { type: 'bar', data: { labels: days.map(d=>d.slice(-2)), datasets: [{ label: 'Desv. Despertar vs 6AM (h)', data: dataWake, backgroundColor: cColor }] }, options: { maintainAspectRatio:false, plugins: { datalabels: { formatter: (v)=>v?v.toFixed(1):'' } }, scales: { y: { min: -3, max: 3 } } } });
                 } else if (type === 'accumulated') {
                     let acc=0, dataAcc=days.map(d=>{ if(currentData.sleep[d]) { let [sh,sm]=currentData.sleep[d].sleepTime.split(':').map(Number), [wh,wm]=currentData.sleep[d].wakeTime.split(':').map(Number); let dur=(wh+wm/60)-(sh+sm/60); acc+=dur<0?dur+24:dur; } return acc; });
-                    charts.sleep = new Chart(ctx, { type: 'line', data: { labels: days.map(d=>d.slice(-2)), datasets: [{ label: 'Hrs Acumuladas', data: dataAcc, fill:true, backgroundColor: currentData.themeColor+'40', borderColor: currentData.themeColor }] }, options: { maintainAspectRatio:false, plugins: { legend: {display:false} } } });
+                    let idealMeta = days.map((d,i) => (i+1)*7);
+                    charts.sleep = new Chart(ctx, { type: 'line', data: { labels: days.map(d=>d.slice(-2)), datasets: [{ label: 'Hrs Reales', data: dataAcc, fill:true, backgroundColor: cColor+'40', borderColor: cColor }, {label: 'Meta (7h/d)', data: idealMeta, borderColor: '#ff4757', borderDash: [5,5], fill:false, pointRadius:0}] }, options: { maintainAspectRatio:false, plugins: { datalabels:{display:false} } } });
                 }
             }
         }
 
-        // ================= 2. ESTUDIO =================
+        // ================= 2. ESTUDIO (SOBRESCRIBIR Y NEGATIVOS EVITADOS) =================
         function updateStudy() {
-            let subj=document.getElementById('studySubjectSelect').value, hrs=parseFloat(document.getElementById('studyHours').value), perf=parseInt(document.getElementById('studyPerf').value);
-            if(!subj || isNaN(hrs)) return; let today=getDateKey(); if(!currentData.study[today]) currentData.study[today]=[];
-            currentData.study[today].push({ subject: subj, hours: hrs, performance: isNaN(perf)?5:perf }); saveData(); renderStudyChart();
+            let subj=document.getElementById('studySubjectSelect').value;
+            let hrs=parseFloat(document.getElementById('studyHours').value);
+            let perf=parseInt(document.getElementById('studyPerf').value);
+            if(!subj || isNaN(hrs) || hrs < 0) return; 
+            
+            let today=getDateKey(); 
+            if(!currentData.study[today]) currentData.study[today]=[];
+            
+            // SOBREESCRIBIR en vez de sumar/acumular bugs
+            currentData.study[today] = currentData.study[today].filter(s => s.subject !== subj);
+            currentData.study[today].push({ subject: subj, hours: hrs, performance: isNaN(perf)||perf<0?5:perf }); 
+            
+            saveData(); renderStudyChart();
         }
         function renderStudyChart() {
             const type=document.getElementById('studyChartType').value; if(charts.study) charts.study.destroy();
-            let days=getLast7Days(), ctx=document.getElementById('studyChart'), opts={maintainAspectRatio:false, plugins:{legend:{labels:{color:'#fff',boxWidth:10}}}, scales:{y:{beginAtZero:true}}};
+            let days=getLast7Days(), ctx=document.getElementById('studyChart'), opts={maintainAspectRatio:false, plugins:{datalabels:{display:false}}};
             if(type==='stacked') {
-                opts.scales.x={stacked:true}; opts.scales.y.stacked=true;
+                opts.scales={x:{stacked:false}, y:{stacked:false, beginAtZero:true}}; opts.plugins.datalabels.display = true;
                 let datasets=currentData.studySubjects.map((subj,i)=>({label:subj, backgroundColor:palette[i%palette.length], data:days.map(d=>{if(!currentData.study[d])return 0; return currentData.study[d].filter(s=>s.subject===subj).reduce((sum,s)=>sum+s.hours,0);})}));
                 charts.study=new Chart(ctx,{type:'bar', data:{labels:days.map(d=>d.slice(-2)), datasets}, options:opts});
             } else if(type==='accumulation') {
-                let acc=0, data=days.map(d=>{if(currentData.study[d]) acc+=currentData.study[d].reduce((sum,s)=>sum+s.hours,0); return acc;}); opts.plugins.legend.display=false;
-                charts.study=new Chart(ctx,{type:'line', data:{labels:days.map(d=>d.slice(-2)), datasets:[{label:'Hrs', data, fill:true, borderColor:currentData.themeColor, backgroundColor:currentData.themeColor+'40'}]}, options:opts});
+                let acc=0, data=days.map(d=>{if(currentData.study[d]) acc+=currentData.study[d].reduce((sum,s)=>sum+s.hours,0); return acc;});
+                let movAvg = data.map((v,i,a) => i<2?v : (a[i]+a[i-1]+a[i-2])/3); 
+                charts.study=new Chart(ctx,{type:'line', data:{labels:days.map(d=>d.slice(-2)), datasets:[{label:'Acumulado', data, fill:true, borderColor:currentData.themeColor, backgroundColor:currentData.themeColor+'30'}, {label:'Tendencia', data:movAvg, borderColor:'#ffa502', borderDash:[5,5]}]}, options:opts});
             } else if(type==='scatter') {
-                let sData=[]; Object.keys(currentData.study).forEach(d=>{currentData.study[d].forEach(e=>{sData.push({x:e.hours, y:e.performance});});});
-                opts.scales.x={title:{display:true,text:'Hrs'}}; opts.scales.y={title:{display:true,text:'Rend. (1-10)'}, max:10}; opts.plugins.legend.display=false;
-                charts.study=new Chart(ctx,{type:'scatter', data:{datasets:[{label:'Sesiones', data:sData, backgroundColor:currentData.themeColor}]}, options:opts});
-            } else if(type==='streaks') {
-                let streakData=days.map(d=>currentData.study[d]&&currentData.study[d].length>0?1:0); opts.plugins.legend.display=false;
-                charts.study=new Chart(ctx,{type:'bar', data:{labels:days.map(d=>d.slice(-2)), datasets:[{label:'Estudió', data:streakData, backgroundColor:currentData.themeColor}]}, options:opts});
+                let sData=[]; Object.keys(currentData.study).forEach(d=>{currentData.study[d].forEach(e=>{sData.push({x:e.hours, y:e.performance, r: e.hours*3+4});});});
+                opts.scales={x:{title:{display:true,text:'Volumen (Horas)'}}, y:{title:{display:true,text:'Rendimiento (1-10)'}, max:10}}; 
+                charts.study=new Chart(ctx,{type:'bubble', data:{datasets:[{label:'Sesiones', data:sData, backgroundColor:currentData.themeColor+'80', borderColor:currentData.themeColor}]}, options:opts});
             }
         }
 
-        // ================= 3. EJERCICIO =================
+        // ================= 3. EJERCICIO (SOBRESCRIBIR Y NEGATIVOS EVITADOS) =================
         function updateExercise() {
-            let type=document.getElementById('exerciseTypeSelect').value, dur=parseFloat(document.getElementById('exDuration').value), met=parseFloat(document.getElementById('exMetric').value);
-            if(!type || isNaN(dur)) return; let today=getDateKey(); if(!currentData.exercise[today]) currentData.exercise[today]=[];
-            currentData.exercise[today].push({type, duration:dur, metric:isNaN(met)?0:met}); saveData(); renderExerciseChart();
+            let type=document.getElementById('exerciseTypeSelect').value;
+            let dur=parseFloat(document.getElementById('exDuration').value);
+            let met=parseFloat(document.getElementById('exMetric').value);
+            if(!type || isNaN(dur) || dur < 0) return; 
+            
+            let today=getDateKey(); 
+            if(!currentData.exercise[today]) currentData.exercise[today]=[];
+            
+            // SOBREESCRIBIR
+            currentData.exercise[today] = currentData.exercise[today].filter(x => x.type !== type);
+            currentData.exercise[today].push({type, duration:dur, metric:isNaN(met)||met<0?0:met}); 
+            
+            saveData(); renderExerciseChart();
         }
         function renderExerciseChart() {
             const type=document.getElementById('exerciseChartType').value; if(charts.exercise) charts.exercise.destroy();
-            let days=getLast7Days(), ctx=document.getElementById('exerciseChart'), opts={maintainAspectRatio:false, plugins:{legend:{labels:{color:'#fff',boxWidth:10}}}};
+            let days=getLast7Days(), ctx=document.getElementById('exerciseChart'), opts={maintainAspectRatio:false, plugins:{datalabels:{display:false}}};
             if(type==='bar') {
                 let datasets=currentData.exerciseTypes.map((t,i)=>({label:t, backgroundColor:palette[i%palette.length], data:days.map(d=>{if(!currentData.exercise[d])return 0; return currentData.exercise[d].filter(x=>x.type===t).reduce((sum,x)=>sum+x.duration,0);})}));
-                opts.scales={x:{stacked:true},y:{stacked:true}}; charts.exercise=new Chart(ctx,{type:'bar', data:{labels:days.map(d=>d.slice(-2)), datasets}, options:opts});
+                opts.scales={x:{stacked:true},y:{stacked:true}}; opts.plugins.datalabels.display = true;
+                charts.exercise=new Chart(ctx,{type:'bar', data:{labels:days.map(d=>d.slice(-2)), datasets}, options:opts});
             } else if(type==='lineProgress') {
-                let data=days.map(d=>{if(!currentData.exercise[d]||currentData.exercise[d].length===0)return 0; return Math.max(...currentData.exercise[d].map(x=>x.metric));}); opts.plugins.legend.display=false;
-                charts.exercise=new Chart(ctx,{type:'line', data:{labels:days.map(d=>d.slice(-2)), datasets:[{label:'Max Metrica', data, borderColor:currentData.themeColor, tension:0.3}]}, options:opts});
+                let maxM = days.map(d=>{ if(!currentData.exercise[d]||currentData.exercise[d].length===0)return null; return Math.max(...currentData.exercise[d].map(x=>x.metric)); });
+                let base = maxM.find(v => v !== null) || 1;
+                let data = maxM.map(v => v===null? null : ((v-base)/base)*100);
+                opts.scales = { y: { title: {display:true, text:'Crecimiento %'} } }; opts.plugins.datalabels = {display:true, formatter: v=>v?v.toFixed(1)+'%':''};
+                charts.exercise=new Chart(ctx,{type:'line', data:{labels:days.map(d=>d.slice(-2)), datasets:[{label:'Progreso %', data, borderColor:currentData.themeColor, tension:0, spanGaps:true}]}, options:opts});
             } else if(type==='radarTypes') {
                 let totals=currentData.exerciseTypes.map(t=>{let sum=0; Object.values(currentData.exercise).forEach(arr=>{sum+=arr.filter(x=>x.type===t).reduce((s,x)=>s+x.duration,0);}); return sum;});
-                opts.scales={r:{ticks:{display:false}, pointLabels:{color:'#aaa'}}}; opts.plugins.legend.display=false;
+                opts.scales={r:{ticks:{display:false}, pointLabels:{color:'#aaa'}}}; opts.plugins.datalabels.display=true;
                 charts.exercise=new Chart(ctx,{type:'radar', data:{labels:currentData.exerciseTypes, datasets:[{label:'Minutos', data:totals, backgroundColor:currentData.themeColor+'60', borderColor:currentData.themeColor}]}, options:opts});
             } else if(type==='frequency') {
                 let hd=Array.from({length:28}, (_,i)=>{let d=getBaseDate(); d.setDate(d.getDate()-(27-i)); return getDateKey(d);}), weeks=[0,0,0,0];
-                hd.forEach((d,i)=>{if(currentData.exercise[d]&&currentData.exercise[d].length>0) weeks[Math.floor(i/7)]++;}); opts.scales={y:{max:7}}; opts.plugins.legend.display=false;
-                charts.exercise=new Chart(ctx,{type:'bar', data:{labels:['S1','S2','S3','S4'], datasets:[{label:'Días', data:weeks, backgroundColor:currentData.themeColor}]}, options:opts});
+                hd.forEach((d,i)=>{if(currentData.exercise[d]&&currentData.exercise[d].length>0) weeks[Math.floor(i/7)]++;}); 
+                let l = ['Sem -3','Sem -2','Sem -1','Esta Sem'];
+                opts.scales={y:{max:7, title:{display:true, text:'Días entrenados'}}}; opts.plugins.datalabels.display=true;
+                charts.exercise=new Chart(ctx,{type:'bar', data:{labels:l, datasets:[{label:'Frecuencia', data:weeks, backgroundColor:currentData.themeColor}]}, options:opts});
             }
         }
 
-        // ================= 4. LECTURA =================
+        // ================= 4. LECTURA (SOBRESCRIBIR Y NEGATIVOS EVITADOS) =================
         function updateReadingGoal() { currentData.readingGoal=parseInt(document.getElementById('monthlyReadingGoal').value)||500; saveData(); renderReadingChart(); }
         function toggleBookStatus() {
             let b=document.getElementById('bookSelector').value, t=getDateKey();
@@ -527,24 +594,44 @@
             saveData(); renderReadingChart();
         }
         function updateReading() {
-            let b=document.getElementById('bookSelector').value, p=parseInt(document.getElementById('pagesRead').value);
-            if(!b || isNaN(p)) return; let t=getDateKey(); if(!currentData.reading[t]) currentData.reading[t]={}; currentData.reading[t][b]=(currentData.reading[t][b]||0)+p; saveData(); renderReadingChart();
+            let b=document.getElementById('bookSelector').value;
+            let p=parseInt(document.getElementById('pagesRead').value);
+            if(!b || isNaN(p) || p < 0) return; 
+            
+            let t=getDateKey(); 
+            if(!currentData.reading[t]) currentData.reading[t]={}; 
+            
+            // SOBREESCRIBIR 
+            currentData.reading[t][b] = p; 
+            
+            saveData(); renderReadingChart();
         }
         function renderReadingChart() {
             const type=document.getElementById('readingChartType').value; if(charts.reading) charts.reading.destroy();
-            let days=getLast7Days(), ctx=document.getElementById('readingChart'), opts={maintainAspectRatio:false, plugins:{legend:{labels:{color:'#fff',boxWidth:10}}}};
-            if(type==='bar' || type==='area') {
+            let days=getLast7Days(), ctx=document.getElementById('readingChart'), opts={maintainAspectRatio:false, plugins:{datalabels:{display:false}}};
+            
+            if(type==='area') {
                 let datasets=currentData.books.map((b,i)=>{
                     let col=palette[i%palette.length], data=days.map(d=>(currentData.reading[d]&&currentData.reading[d][b])?currentData.reading[d][b]:0);
-                    if(type==='area'){let acc=0; data=data.map(v=>{acc+=v; return acc;});} return {label:b, data, backgroundColor:type==='area'?col+'40':col, borderColor:col, fill:type==='area', tension:0.3};
+                    return {label:b, data, backgroundColor:col+'60', borderColor:col, fill:true, tension:0.3};
                 });
-                opts.scales={x:{stacked:type==='bar'},y:{stacked:type==='bar'}}; charts.reading=new Chart(ctx,{type:type==='area'?'line':'bar', data:{labels:days.map(d=>d.slice(-2)), datasets}, options:opts});
+                opts.scales={x:{stacked:true},y:{stacked:true}}; 
+                charts.reading=new Chart(ctx,{type:'line', data:{labels:days.map(d=>d.slice(-2)), datasets}, options:opts});
             } else if(type==='goalVsActual') {
-                let tm=0; getMonthDays().forEach(d=>{if(currentData.reading[d]) Object.values(currentData.reading[d]).forEach(p=>tm+=p);}); opts.plugins.legend.display=false;
-                charts.reading=new Chart(ctx,{type:'doughnut', data:{labels:['Leído','Restante'], datasets:[{data:[tm, Math.max(0, currentData.readingGoal-tm)], backgroundColor:[currentData.themeColor,'#2a2a2a']}]}, options:opts});
+                let tm=0; getMonthDays().forEach(d=>{if(currentData.reading[d]) Object.values(currentData.reading[d]).forEach(p=>tm+=p);}); 
+                let isBehind = tm < (currentData.readingGoal/30 * new Date().getDate());
+                let mainColor = isBehind ? '#ffa502' : currentData.themeColor;
+                opts.plugins.centerText = { text: `${tm} / ${currentData.readingGoal}`, color: mainColor };
+                opts.rotation = -90; opts.circumference = 180; opts.cutout = '75%';
+                charts.reading=new Chart(ctx,{type:'doughnut', data:{labels:['Leído','Restante'], datasets:[{data:[tm, Math.max(0, currentData.readingGoal-tm)], backgroundColor:[mainColor,'#2a2a2a'], borderWidth:0}]}, options:opts});
             } else if(type==='timeline') {
-                let lbls=Object.keys(currentData.bookDates), data=lbls.map(b=>{let s=new Date(currentData.bookDates[b].start).getDate(), e=currentData.bookDates[b].end?new Date(currentData.bookDates[b].end).getDate():new Date().getDate(); return [s,e];});
-                opts.indexAxis='y'; opts.plugins.legend.display=false; charts.reading=new Chart(ctx,{type:'bar', data:{labels:lbls, datasets:[{data, backgroundColor:currentData.themeColor}]}, options:opts});
+                let lbls=Object.keys(currentData.bookDates), data=lbls.map(b=>{
+                    let sm = new Date(currentData.bookDates[b].start).getDate();
+                    let em = currentData.bookDates[b].end?new Date(currentData.bookDates[b].end).getDate() : new Date().getDate();
+                    return [sm, em];
+                });
+                opts.indexAxis='y'; opts.scales={x:{min:1, max:31}};
+                charts.reading=new Chart(ctx,{type:'bar', data:{labels:lbls, datasets:[{data, backgroundColor:currentData.themeColor}]}, options:opts});
             }
         }
 
@@ -554,45 +641,62 @@
         }
         function renderPersonalCareChart() {
             const type=document.getElementById('careChartType').value, cont=document.getElementById('personalCareChartContainer'), cal=document.getElementById('personalCareCalendar');
-            let tObj=currentData.personalCare[getDateKey()]||{}; ['ducha','cara','dientes_m','dientes_t','dientes_n','skin'].forEach(k=>{document.getElementById(`care_${k}`).checked=!!tObj[k];});
+            let tObj=currentData.personalCare[getDateKey()]||{}, cColor=currentData.themeColor;
+            ['ducha','cara','dientes_m','dientes_t','dientes_n','skin'].forEach(k=>{document.getElementById(`care_${k}`).checked=!!tObj[k];});
+            
             if(type==='calendar') {
                 cont.classList.add('hidden'); cal.classList.remove('hidden'); cal.innerHTML='';
                 getMonthDays().forEach((dKey,i)=>{
                     let dEl=document.createElement('div'); dEl.className='heat-day'; dEl.textContent=i+1; let o=currentData.personalCare[dKey];
-                    if(o){let s=(o.ducha?1:0)+(o.cara?1:0)+(o.dientes_m?1:0)+(o.dientes_t?1:0)+(o.dientes_n?1:0)+(o.skin?1:0); if(s===6)dEl.classList.add('completed'); else if(s>0)dEl.classList.add('partial'); else dEl.classList.add('missed');}
+                    if(o){let s=(o.ducha?1:0)+(o.cara?1:0)+(o.dientes_m?1:0)+(o.dientes_t?1:0)+(o.dientes_n?1:0)+(o.skin?1:0); if(s===6)dEl.classList.add('good'); else if(s>3)dEl.classList.add('ok'); else dEl.classList.add('bad');} else dEl.classList.add('empty');
                     cal.appendChild(dEl);
                 });
             } else {
                 cont.classList.remove('hidden'); cal.classList.add('hidden'); if(charts.personalCare) charts.personalCare.destroy();
                 let ctx=document.getElementById('personalCareChart'), days=getLast7Days();
+                
                 if(type==='radar') {
                     let tot={d:0, c:0, m:0, t:0, n:0, s:0}; days.forEach(d=>{let o=currentData.personalCare[d]; if(o){if(o.ducha)tot.d++; if(o.cara)tot.c++; if(o.dientes_m)tot.m++; if(o.dientes_t)tot.t++; if(o.dientes_n)tot.n++; if(o.skin)tot.s++;}});
-                    charts.personalCare=new Chart(ctx,{type:'radar', data:{labels:['Ducha','Cara','Dient. ☀️','Dient. 🌤️','Dient. 🌙','Skincare'], datasets:[{label:'Veces', data:[tot.d,tot.c,tot.m,tot.t,tot.n,tot.s], backgroundColor:currentData.themeColor+'60', borderColor:currentData.themeColor, pointBackgroundColor:currentData.themeColor}]}, options:{maintainAspectRatio:false, scales:{r:{min:0, max:7, ticks:{display:false}, pointLabels:{color:'#e0e0e0',font:{size:10}}, grid:{color:'#2a2a2a'}, angleLines:{color:'#2a2a2a'}}}, plugins:{legend:{display:false}}}});
+                    let norm = [tot.d/7, tot.c/7, tot.m/7, tot.t/7, tot.n/7, tot.s/7]; 
+                    charts.personalCare=new Chart(ctx,{type:'radar', data:{labels:['Ducha','Cara','Dient. ☀️','Dient. 🌤️','Dient. 🌙','Skincare'], datasets:[{label:'Éxito %', data:norm, backgroundColor:cColor+'40', borderColor:cColor, fill:true}]}, options:{maintainAspectRatio:false, plugins:{datalabels:{display:false}}, scales:{r:{min:0, max:1, ticks:{display:false}, pointLabels:{color:'#e0e0e0',font:{size:10}}}}}});
                 } else if(type==='compliance') {
                     let cData=days.map(d=>{let o=currentData.personalCare[d]; if(!o)return 0; return (((o.ducha?1:0)+(o.cara?1:0)+(o.dientes_m?1:0)+(o.dientes_t?1:0)+(o.dientes_n?1:0)+(o.skin?1:0))/6)*100;});
-                    charts.personalCare=new Chart(ctx,{type:'line', data:{labels:days.map(d=>d.slice(-2)), datasets:[{label:'% Cump.', data:cData, borderColor:currentData.themeColor, tension:0.3}]}, options:{maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{y:{max:100}}}});
+                    charts.personalCare=new Chart(ctx,{type:'bar', data:{labels:days.map(d=>d.slice(-2)), datasets:[{label:'Cumplimiento %', data:cData, 
+                    backgroundColor: cData.map(v => v>=80 ? '#2ecc71' : v>=50 ? '#f1c40f' : '#e74c3c')}]}, options:{maintainAspectRatio:false, plugins:{datalabels:{display:true, formatter:v=>v.toFixed(0)+'%'}}, scales:{y:{max:100}}}});
                 }
             }
         }
 
-        // ================= 6. HOBBIES =================
-        function renderHobbiesInputs() {
-            document.getElementById('hobbiesInputs').innerHTML=currentData.hobbiesList.map((h,i)=>{let val=(currentData.hobbies[getDateKey()]||{})[h]||''; return `<div class="flex-input" style="margin:0;"><label style="width:70px; font-size:0.8em; overflow:hidden; text-overflow:ellipsis;">${h}</label><input type="number" id="hob_${i}" value="${val}" style="padding:4px;"><button onclick="updateHobby('${h}',${i})" style="padding:2px 6px;">✓</button></div>`;}).join('');
+        // ================= 6. HOBBIES (SOBRESCRIBIR Y NEGATIVOS EVITADOS) =================
+        function renderHobbiesInputs() { document.getElementById('hobbiesInputs').innerHTML=currentData.hobbiesList.map((h,i)=>{let val=(currentData.hobbies[getDateKey()]||{})[h]||''; return `<div class="flex-input" style="margin:0;"><label style="width:70px; font-size:0.8em; overflow:hidden; text-overflow:ellipsis;">${h}</label><input type="number" id="hob_${i}" value="${val}" style="padding:4px;" min="0"><button onclick="updateHobby('${h}',${i})" style="padding:2px 6px;">✓</button></div>`;}).join(''); }
+        function updateHobby(hName,idx) { 
+            let min=parseInt(document.getElementById(`hob_${idx}`).value); 
+            if(isNaN(min) || min < 0) return; // Evitar negativos
+            
+            let t=getDateKey(); 
+            if(!currentData.hobbies[t])currentData.hobbies[t]={}; 
+            
+            // SOBREESCRIBIR
+            currentData.hobbies[t][hName]=min; 
+            
+            saveData(); renderHobbiesChart(); 
         }
-        function updateHobby(hName,idx) { let min=parseInt(document.getElementById(`hob_${idx}`).value); if(isNaN(min))return; let t=getDateKey(); if(!currentData.hobbies[t])currentData.hobbies[t]={}; currentData.hobbies[t][hName]=min; saveData(); renderHobbiesChart(); }
+        
         function renderHobbiesChart() {
             renderHobbiesInputs(); const type=document.getElementById('hobbiesChartType').value; if(charts.hobbies) charts.hobbies.destroy();
-            let days=getLast7Days(), ctx=document.getElementById('hobbiesChart'), opts={maintainAspectRatio:false, plugins:{legend:{display:type==='radar'||type==='bar', position:'bottom', labels:{color:'#fff',boxWidth:10}}}};
-            if(type==='bar' || type==='radar') {
-                let datasets=currentData.hobbiesList.map((h,i)=>{let col=palette[i%palette.length]; return {label:h, data:days.map(d=>(currentData.hobbies[d]||{})[h]||0), backgroundColor:type==='radar'?col+'40':col, borderColor:col};});
-                if(type==='radar') opts.scales={r:{ticks:{display:false}, pointLabels:{color:'#aaa'}}}; else opts.scales={x:{stacked:true},y:{stacked:true}};
-                charts.hobbies=new Chart(ctx,{type, data:{labels:days.map(d=>d.slice(-2)), datasets}, options:opts});
+            let days=getLast7Days(), ctx=document.getElementById('hobbiesChart'), opts={maintainAspectRatio:false, plugins:{datalabels:{display:type==='bar'}}};
+            
+            if(type==='bar') {
+                let datasets=currentData.hobbiesList.map((h,i)=>({label:h, data:days.map(d=>(currentData.hobbies[d]||{})[h]||0), backgroundColor:palette[i%palette.length]}));
+                opts.scales={x:{stacked:true},y:{stacked:true, title:{display:true, text:'Minutos'}}}; 
+                charts.hobbies=new Chart(ctx,{type:'bar', data:{labels:days.map(d=>d.slice(-2)), datasets}, options:opts});
+            } else if(type==='radar') {
+                let datasets=currentData.hobbiesList.map((h,i)=>{let col=palette[i%palette.length]; return {label:h, data:days.map(d=>(currentData.hobbies[d]||{})[h]||0), backgroundColor:col+'40', borderColor:col, fill:true, spanGaps:true};});
+                opts.scales={r:{ticks:{display:false}, pointLabels:{color:'#aaa'}}}; opts.plugins.datalabels.display = false;
+                charts.hobbies=new Chart(ctx,{type:'radar', data:{labels:days.map(d=>d.slice(-2)), datasets}, options:opts});
             } else if(type==='variety') {
-                let data=days.map(d=>Object.keys(currentData.hobbies[d]||{}).length); charts.hobbies=new Chart(ctx,{type:'bar', data:{labels:days.map(d=>d.slice(-2)), datasets:[{label:'Variedad', data, backgroundColor:currentData.themeColor}]}, options:opts});
-            } else if(type==='timeline') {
-                let sData=[]; days.forEach((d,di)=>{currentData.hobbiesList.forEach((h,hi)=>{if((currentData.hobbies[d]||{})[h]>0) sData.push({x:di, y:hi, r:Math.min((currentData.hobbies[d][h])/5,15)+5});});});
-                opts.scales={x:{ticks:{callback:v=>days[v]?days[v].slice(-2):''}}, y:{ticks:{callback:v=>currentData.hobbiesList[v]||''}}};
-                charts.hobbies=new Chart(ctx,{type:'bubble', data:{datasets:[{label:'Timeline', data:sData, backgroundColor:currentData.themeColor+'80'}]}, options:opts});
+                let data=days.map(d=>Object.keys(currentData.hobbies[d]||{}).length); opts.scales={y:{title:{display:true, text:'N° Hobbies Distintos'}, suggestedMax: 5}};
+                charts.hobbies=new Chart(ctx,{type:'bar', data:{labels:days.map(d=>d.slice(-2)), datasets:[{label:'Variedad', data, backgroundColor:currentData.themeColor}]}, options:opts});
             }
         }
 
